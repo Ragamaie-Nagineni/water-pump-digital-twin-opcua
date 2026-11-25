@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Pump Digital Twin — AI Prognostics & Telemetry</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --card-hover-border: #cbd5e1;
+
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+
+      --blue-primary: #2563eb;
+      --blue-light: #eff6ff;
+      --blue-border: #bfdbfe;
+
+      --purple-primary: #7c3aed;
+      --purple-light: #f5f3ff;
+      --purple-border: #ddd6fe;
+
+      --cyan-primary: #0891b2;
+      --cyan-light: #ecfeff;
+      --cyan-border: #a5f3fc;
+
+      --emerald-primary: #059669;
+      --emerald-light: #ecfdf5;
+      --emerald-border: #a7f3d0;
+
+      --amber-primary: #d97706;
+      --amber-light: #fffbeb;
+      --amber-border: #fde68a;
+
+      --rose-primary: #dc2626;
+      --rose-light: #fef2f2;
+      --rose-border: #fecaca;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Top Header Navigation ── */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+
+    .brand-text p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .header-pills {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .network-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .network-badge i {
+      color: var(--blue-primary);
+    }
+
+    .live-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: var(--emerald-light);
+      color: var(--emerald-primary);
+      border: 1px solid var(--emerald-border);
+      transition: all 0.3s;
+    }
+
+    .live-status-pill.fault {
+      background: var(--rose-light);
+      color: var(--rose-primary);
+      border-color: var(--rose-border);
+      animation: pulseAlert 1.2s infinite;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.75; transform: scale(1.05); }
+    }
+
+    /* ── Main Container ── */
+    .dashboard-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Critical Alarm Banner ── */
+    #alarm-banner {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-left: 6px solid #dc2626;
+      border-radius: 12px;
+      padding: 18px 24px;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.08);
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .alarm-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .alarm-icon {
+      font-size: 2rem;
+      color: #dc2626;
+    }
+
+    .alarm-text h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #991b1b;
+    }
+
+    .alarm-text p {
+      font-size: 0.88rem;
+      color: #b91c1c;
+      margin-top: 2px;
+    }
+
+    .fault-type-badge {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #991b1b;
+      background: #fee2e2;
+      border: 1.5px solid #fca5a5;
+      padding: 6px 16px;
+      border-radius: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Cards ── */
+    .clean-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .clean-card:hover {
+      border-color: var(--card-hover-border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    /* ── Metric Cards Grid ── */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    /* Option 2: Soft Pastel Filled Cards with Deep Saturated Text */
+    .card-speed, .card-torque, .card-power, .card-temp, .card-wear {
+      border-radius: var(--radius-lg);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .card-speed:hover, .card-torque:hover, .card-power:hover,
+    .card-temp:hover, .card-wear:hover {
+      transform: translateY(-3px);
+    }
+
+    /* 1. Rotational Speed (Soft Blue Fill) */
+    .card-speed {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+      border: 1px solid #bfdbfe !important;
+    }
+    .card-speed .card-title { color: #1e40af !important; font-weight: 600; }
+    .card-speed .val-display { color: #1e3a8a !important; }
+    .card-speed .card-icon-badge { background: #bfdbfe !important; color: #1d4ed8 !important; }
+    .card-speed .card-footer-meta { color: #2563eb !important; border-top: 1px solid rgba(37,99,235,0.18) !important; }
+    .card-speed .card-footer-meta span, .card-speed strong { color: #1e40af !important; }
+    .card-speed:hover { border-color: #93c5fd !important; box-shadow: 0 8px 20px rgba(37,99,235,0.14) !important; }
+
+    /* 2. Shaft Torque (Soft Lavender/Purple Fill) */
+    .card-torque {
+      background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%) !important;
+      border: 1px solid #e9d5ff !important;
+    }
+    .card-torque .card-title { color: #6b21a8 !important; font-weight: 600; }
+    .card-torque .val-display { color: #581c87 !important; }
+    .card-torque .card-icon-badge { background: #e9d5ff !important; color: #7c3aed !important; }
+    .card-torque .card-footer-meta { color: #7c3aed !important; border-top: 1px solid rgba(124,58,237,0.18) !important; }
+    .card-torque .card-footer-meta span, .card-torque strong { color: #6b21a8 !important; }
+    .card-torque:hover { border-color: #c4b5fd !important; box-shadow: 0 8px 20px rgba(124,58,237,0.14) !important; }
+
+    /* 3. Hydraulic Power (Soft Cyan/Teal Fill) */
+    .card-power {
+      background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%) !important;
+      border: 1px solid #a5f3fc !important;
+    }
+    .card-power .card-title { color: #0e7490 !important; font-weight: 600; }
+    .card-power .val-display { color: #155e75 !important; }
+    .card-power .card-icon-badge { background: #a5f3fc !important; color: #0891b2 !important; }
+    .card-power .card-footer-meta { color: #0891b2 !important; border-top: 1px solid rgba(8,145,178,0.18) !important; }
+    .card-power .card-footer-meta span, .card-power strong { color: #0e7490 !important; }
+    .card-power:hover { border-color: #67e8f9 !important; box-shadow: 0 8px 20px rgba(8,145,178,0.14) !important; }
+
+    /* 4. Thermal Gradient (Soft Mint Green Fill) */
+    .card-temp {
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+      border: 1px solid #a7f3d0 !important;
+    }
+    .card-temp .card-title { color: #065f46 !important; font-weight: 600; }
+    .card-temp .val-display { color: #047857 !important; }
+    .card-temp .card-icon-badge { background: #a7f3d0 !important; color: #059669 !important; }
+    .card-temp .card-footer-meta { color: #059669 !important; border-top: 1px solid rgba(5,150,105,0.18) !important; }
+    .card-temp .card-footer-meta span, .card-temp strong { color: #065f46 !important; }
+    .card-temp:hover { border-color: #6ee7b7 !important; box-shadow: 0 8px 20px rgba(5,150,105,0.14) !important; }
+
+    /* 5. Impeller Tool Wear (Soft Warm Amber Fill) */
+    .card-wear {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+      border: 1px solid #fde68a !important;
+    }
+    .card-wear .card-title { color: #92400e !important; font-weight: 600; }
+    .card-wear .val-display { color: #b45309 !important; }
+    .card-wear .card-icon-badge { background: #fde68a !important; color: #d97706 !important; }
+    .card-wear .card-footer-meta { color: #d97706 !important; border-top: 1px solid rgba(217,119,6,0.18) !important; }
+    .card-wear .card-footer-meta span, .card-wear strong { color: #92400e !important; }
+    .card-wear:hover { border-color: #fcd34d !important; box-shadow: 0 8px 20px rgba(217,119,6,0.14) !important; }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .card-icon-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+    }
+
+    .badge-blue { background: var(--blue-light); color: var(--blue-primary); }
+    .badge-purple { background: var(--purple-light); color: var(--purple-primary); }
+    .badge-cyan { background: var(--cyan-light); color: var(--cyan-primary); }
+    .badge-emerald { background: var(--emerald-light); color: var(--emerald-primary); }
+    .badge-amber { background: var(--amber-light); color: var(--amber-primary); }
+
+    .val-display {
+      font-size: 2.1rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.1;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .card-footer-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 8px;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* ── Middle Section ── */
+    .middle-section {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 1080px) {
+      .middle-section { grid-template-columns: 1fr; }
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title i {
+      color: var(--blue-primary);
+    }
+
+    .ai-hero-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .ai-status-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .ai-status-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--emerald-primary);
+    }
+
+    .ai-mode-tag {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--blue-primary);
+      background: var(--blue-light);
+      border: 1px solid var(--blue-border);
+      padding: 5px 12px;
+      border-radius: 6px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    /* RUL Progress Bar */
+    .rul-block {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .rul-top-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .rul-bar-track {
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .rul-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+      border-radius: 5px;
+      width: 85%;
+      transition: width 0.5s ease;
+    }
+
+    .rul-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .ai-note-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    /* Constraints Table */
+    .constraints-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    .constraints-table th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 600;
+    }
+
+    .constraints-table td {
+      padding: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      color: var(--text-primary);
+    }
+
+    .badge-check {
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-pass {
+      background: var(--emerald-light);
+      color: var(--emerald-primary);
+      border: 1px solid var(--emerald-border);
+    }
+
+    .badge-warn {
+      background: var(--rose-light);
+      color: var(--rose-primary);
+      border: 1px solid var(--rose-border);
+    }
+
+    /* ── Time Series Charts ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    .chart-container {
+      height: 190px;
+      position: relative;
+    }
+
+    /* ── Historian Table ── */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table.historian-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+
+    table.historian-table th {
+      background: #f8fafc;
+      padding: 11px 16px;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 600;
+    }
+
+    table.historian-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      color: var(--text-primary);
+    }
+
+    table.historian-table tr:hover {
+      background: #f8fafc;
+    }
+
+    .btn-export-csv {
+      background: #ffffff;
+      color: var(--text-secondary);
+      border: 1px solid #cbd5e1;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-export-csv:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: var(--text-primary);
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid #e2e8f0;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      background: #ffffff;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Top Header Navigation ── -->
+  <header>
+    <div class="brand-container">
+      <div class="brand-icon">
+        <i class="fa-solid fa-water"></i>
+      </div>
+      <div class="brand-text">
+        <h1>Water Pump Digital Twin — AI Diagnostics</h1>
+        <p>Asset ID: Unit-04 Centrifugal Pump &bull; OPC-UA Protocol &bull; MQTT Real-Time Telemetry</p>
+      </div>
+    </div>
+
+    <div class="header-pills font-mono">
+      <div class="network-badge">
+        <i class="fa-solid fa-satellite-dish"></i>
+        <span>broker.hivemq.com:1883</span>
+      </div>
+      <div class="network-badge">
+        <i class="fa-solid fa-network-wired"></i>
+        <span>OPC-UA: ACTIVE</span>
+      </div>
+      <div id="status-pill" class="live-status-pill">
+        <span class="pulse-dot"></span>
+        <span id="status-text">SYSTEM NORMAL</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="dashboard-container">
+
+    <!-- ── Critical Alarm Banner ── -->
+    <div id="alarm-banner">
+      <div class="alarm-info" style="align-items: flex-start; width: 100%;">
+        <i class="fa-solid fa-triangle-exclamation alarm-icon" style="margin-top: 4px;"></i>
+        <div class="alarm-text" style="width: 100%;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <h3 id="alarm-title">CRITICAL FAULT DETECTED</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div id="fault-hold-timer" class="font-mono" style="font-size: 0.76rem; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 4px 10px; border-radius: 6px; border: 1px solid #fca5a5;">HOLD: 15s</div>
+              <div id="fault-type-badge" class="fault-type-badge font-mono">FAULT</div>
+              <button onclick="dismissAlarm()" style="background: #ffffff; border: 1px solid #fca5a5; color: #991b1b; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Dismiss</button>
+            </div>
+          </div>
+          <p id="alarm-desc" style="font-size: 0.84rem; color: #b91c1c; margin-top: 4px;"></p>
+
+          <!-- Explicit Physical Reason & Mathematical Proof Box -->
+          <div id="alarm-physics-box" style="margin-top: 10px; background: #ffffff; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 12px 16px; font-size: 0.8rem; color: #7f1d1d; line-height: 1.55;" class="font-mono">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 5 Metric Cards ── -->
+    <div class="metrics-row">
+
+      <!-- Speed -->
+      <div class="clean-card card-speed">
+        <div class="card-top">
+          <span class="card-title">Rotational Speed</span>
+          <div class="card-icon-badge badge-blue"><i class="fa-solid fa-gauge-high"></i></div>
+        </div>
+        <div class="val-display font-mono" id="val-rpm">—</div>
+        <div class="card-footer-meta font-mono">
+          <span>Operating Band: 1200 - 2800</span>
+          <span id="sub-freq" style="color: var(--blue-primary); font-weight: 600;">— Hz</span>
+        </div>
+      </div>
+
+      <!-- Torque -->
+      <div class="clean-card card-torque">
+        <div class="card-top">
+          <span class="card-title">Shaft Torque</span>
+          <div class="card-icon-badge badge-purple"><i class="fa-solid fa-rotate"></i></div>
+        </div>
+        <div class="val-display font-mono" id="val-torque">—</div>
+        <div class="card-footer-meta font-mono">
+          <span>Rated: 40.0 Nm</span>
+          <span id="sub-torque-load" style="color: var(--purple-primary); font-weight: 600;">—% load</span>
+        </div>
+      </div>
+
+      <!-- Power -->
+      <div class="clean-card card-power">
+        <div class="card-top">
+          <span class="card-title">Hydraulic Power</span>
+          <div class="card-icon-badge badge-cyan"><i class="fa-solid fa-bolt"></i></div>
+        </div>
+        <div class="val-display font-mono" id="val-power">—</div>
+        <div class="card-footer-meta font-mono">
+          <span>Formula: 2πNT/60000</span>
+          <span style="color: var(--cyan-primary); font-weight: 600;">Limit: 9.0 kW</span>
+        </div>
+      </div>
+
+      <!-- Thermal Gradient -->
+      <div class="clean-card card-temp">
+        <div class="card-top">
+          <span class="card-title">Thermal Gradient (ΔT)</span>
+          <div class="card-icon-badge badge-emerald"><i class="fa-solid fa-temperature-half"></i></div>
+        </div>
+        <div class="val-display font-mono" id="val-temp-diff">—</div>
+        <div class="card-footer-meta font-mono">
+          <span>Proc: <strong id="val-proc-temp">—</strong></span>
+          <span>Air: <strong id="val-air-temp">—</strong></span>
+        </div>
+      </div>
+
+      <!-- Tool Wear -->
+      <div class="clean-card card-wear">
+        <div class="card-top">
+          <span class="card-title">Impeller Tool Wear</span>
+          <div class="card-icon-badge badge-amber"><i class="fa-solid fa-wrench"></i></div>
+        </div>
+        <div class="val-display font-mono" id="val-wear">—</div>
+        <div class="card-footer-meta font-mono">
+          <span>Threshold: 250 min</span>
+          <span id="sub-wear-pct" style="color: var(--amber-primary); font-weight: 600;">—%</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Middle Section: AI Diagnostics & Operating Envelope ── -->
+    <div class="middle-section">
+
+      <!-- Left: AI Health State -->
+      <div class="clean-card">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-brain"></i> AI Diagnostics &amp; Remaining Useful Life (RUL)</div>
+          <span class="font-mono" style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">RANDOM FOREST (98.3%)</span>
+        </div>
+
+        <div class="ai-hero-box">
+          <div>
+            <div class="ai-status-label font-mono">Asset Health State</div>
+            <div id="ml-status-display" class="ai-status-value font-mono">NORMAL</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="ai-status-label font-mono">Identified Mode</div>
+            <div id="ml-mode-display" class="ai-mode-tag font-mono">HEALTHY</div>
+          </div>
+        </div>
+
+        <!-- RUL Progress Bar -->
+        <div class="rul-block">
+          <div class="rul-top-row font-mono">
+            <span style="color: var(--text-muted);">PREDICTED RUL PROGNOSIS</span>
+            <span id="rul-text" style="color: var(--blue-primary); font-size: 0.95rem; font-weight: 700;">— HOURS</span>
+          </div>
+          <div class="rul-bar-track">
+            <div id="rul-bar" class="rul-bar-fill"></div>
+          </div>
+          <div class="rul-ticks font-mono">
+            <span>0 hrs (Critical)</span>
+            <span>200 hrs</span>
+            <span>400 hrs (New Asset)</span>
+          </div>
+        </div>
+
+        <div class="ai-note-box font-mono" id="diag-note">
+          <i class="fa-solid fa-circle-check" style="color: var(--emerald-primary); margin-right: 6px;"></i>
+          Telemetry nominal. Hydrodynamic load, mechanical torque, and thermal dissipation conform to baseline standards.
+        </div>
+      </div>
+
+      <!-- Right: Physical Constraints & Physics-Informed ML Engine -->
+      <div class="clean-card">
+        <div class="section-header">
+          <div class="section-title"><i class="fa-solid fa-atom"></i> Physics-Informed Feature Engineering &amp; Constraints</div>
+          <span class="font-mono" style="font-size: 0.72rem; color: var(--blue-primary); font-weight: 700;">THERMODYNAMIC &amp; MECHANICAL LAWS</span>
+        </div>
+
+        <table class="constraints-table font-mono">
+          <thead>
+            <tr>
+              <th>Physical Law / Formula</th>
+              <th>Computed</th>
+              <th>Safe Envelope</th>
+              <th>Target Mode</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong style="color:var(--text-primary);">Thermal Dissipation</strong><br>
+                <span style="font-size:0.7rem; color:var(--text-muted);">&Delta;T = T<sub>proc</sub> &minus; T<sub>air</sub></span>
+              </td>
+              <td id="diag-cur-dt">—</td>
+              <td>&ge; 8.6 K</td>
+              <td><span style="color:var(--text-secondary); font-weight:600;">HDF</span></td>
+              <td><span id="diag-pill-dt" class="badge-check badge-pass">PASS</span></td>
+            </tr>
+            <tr>
+              <td>
+                <strong style="color:var(--text-primary);">Hydraulic Power</strong><br>
+                <span style="font-size:0.7rem; color:var(--text-muted);">P = 2&pi; &times; RPM &times; &tau; / 60000</span>
+              </td>
+              <td id="diag-cur-power">—</td>
+              <td>3.5 - 9.0 kW</td>
+              <td><span style="color:var(--text-secondary); font-weight:600;">PWF</span></td>
+              <td><span id="diag-pill-power" class="badge-check badge-pass">PASS</span></td>
+            </tr>
+            <tr>
+              <td>
+                <strong style="color:var(--text-primary);">Mechanical Overstrain</strong><br>
+                <span style="font-size:0.7rem; color:var(--text-muted);">&sigma; = Wear &times; Torque</span>
+              </td>
+              <td id="diag-cur-overstrain">—</td>
+              <td>&le; 11,000</td>
+              <td><span style="color:var(--text-secondary); font-weight:600;">OSF</span></td>
+              <td><span id="diag-pill-overstrain" class="badge-check badge-pass">PASS</span></td>
+            </tr>
+            <tr>
+              <td>
+                <strong style="color:var(--text-primary);">Impeller Tool Wear</strong><br>
+                <span style="font-size:0.7rem; color:var(--text-muted);">Cumulative Runtime Friction</span>
+              </td>
+              <td id="diag-cur-wear">—</td>
+              <td>&le; 240 min</td>
+              <td><span style="color:var(--text-secondary); font-weight:600;">TWF</span></td>
+              <td><span id="diag-pill-wear" class="badge-check badge-pass">PASS</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Live Physics-to-AI Pipeline Callout -->
+        <div style="margin-top: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 0.76rem;" class="font-mono">
+          <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-microchip" style="color: var(--blue-primary);"></i> AI Ingestion Pipeline (Zero Ground-Truth Dependence):
+          </div>
+          <div style="color: var(--text-secondary); line-height: 1.4;">
+            Raw Sensors &rarr; Derived Physics (&Delta;T, Power, Overstrain) &rarr; Random Forest (100 Decision Trees) &rarr; Health &amp; RUL Classification
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── 3 Time-Series Charts ── -->
+    <div class="charts-row">
+      <div class="clean-card">
+        <div class="section-header" style="margin-bottom: 8px;">
+          <span class="card-title" style="color: var(--blue-primary);"><i class="fa-solid fa-chart-line"></i> Rotational Speed (RPM)</span>
+          <span class="font-mono" style="font-size: 0.7rem; color: var(--text-muted);">Real-Time</span>
+        </div>
+        <div class="chart-container"><canvas id="chart-rpm"></canvas></div>
+      </div>
+
+      <div class="clean-card">
+        <div class="section-header" style="margin-bottom: 8px;">
+          <span class="card-title" style="color: var(--purple-primary);"><i class="fa-solid fa-chart-area"></i> Shaft Torque (Nm)</span>
+          <span class="font-mono" style="font-size: 0.7rem; color: var(--text-muted);">Real-Time</span>
+        </div>
+        <div class="chart-container"><canvas id="chart-torque"></canvas></div>
+      </div>
+
+      <div class="clean-card">
+        <div class="section-header" style="margin-bottom: 8px;">
+          <span class="card-title" style="color: var(--emerald-primary);"><i class="fa-solid fa-chart-spline"></i> Temperature Trend (K)</span>
+          <span class="font-mono" style="font-size: 0.7rem; color: var(--text-muted);">Real-Time</span>
+        </div>
+        <div class="chart-container"><canvas id="chart-temp"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Historian Table ── -->
+    <div class="clean-card">
+      <div class="section-header">
+        <div class="section-title"><i class="fa-solid fa-database"></i> Live Telemetry Audit Trail (Historian)</div>
+        <button class="btn-export-csv" onclick="exportToCSV()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+      </div>
+
+      <div class="table-container">
+        <table class="historian-table font-mono">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Speed (RPM)</th>
+              <th>Torque (Nm)</th>
+              <th>Air Temp (K)</th>
+              <th>Tool Wear</th>
+              <th>RUL (Hrs)</th>
+              <th>Fault Type</th>
+              <th>Condition State</th>
+            </tr>
+          </thead>
+          <tbody id="telemetry-table-body">
+            <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">Awaiting telemetry records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer class="font-mono">
+    <div>WATER PUMP DIGITAL TWIN &bull; ADVANCED FAULT DIAGNOSTICS &amp; PROGNOSTICS</div>
+    <div>PACKETS LOGGED: <span id="footer-packet-count" style="color: var(--blue-primary); font-weight: 700;">0</span> &bull; LAST CYCLE: <span id="footer-sync-time">—</span></div>
+    <div>DEPARTMENT OF INSTRUMENTATION &amp; CONTROL</div>
+  </footer>
+
+  <script>
+    // ── Setup Clean Light-Mode Charts ──
+    function createCleanChart(canvasId, label, colorHex, fillHex) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+      gradient.addColorStop(0, fillHex);
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: label,
+            data: [],
+            borderColor: colorHex,
+            backgroundColor: gradient,
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#94a3b8', font: { family: "'JetBrains Mono'" }, maxTicksLimit: 6 }
+            },
+            y: {
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#94a3b8', font: { family: "'JetBrains Mono'" } }
+            }
+          }
+        }
+      });
+    }
+
+    const chartRpm = createCleanChart('chart-rpm', 'Speed (RPM)', '#2563eb', 'rgba(37, 99, 235, 0.12)');
+    const chartTorque = createCleanChart('chart-torque', 'Torque (Nm)', '#7c3aed', 'rgba(124, 58, 237, 0.12)');
+    const chartTemp = createCleanChart('chart-temp', 'Air Temp (K)', '#059669', 'rgba(5, 150, 105, 0.12)');
+
+    function updateChartData(chart, labels, data) {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.update('none');
+    }
+
+    // ── Table Update ──
+    let cachedRows = [];
+    async function refreshHistoryTable() {
+      try {
+        const res = await fetch('/api/readings');
+        const rows = await res.json();
+        if (!rows || rows.length === 0) return;
+        cachedRows = rows;
+
+        const tbody = document.getElementById('telemetry-table-body');
+        tbody.innerHTML = rows.slice(-12).reverse().map(r => {
+          const isFault = r.fault_status === 'FAULT';
+          const pill = isFault
+            ? '<span class="badge-check badge-warn">FAULT</span>'
+            : '<span class="badge-check badge-pass">NORMAL</span>';
+          const faultType = isFault ? `<strong style="color:#dc2626;">${r.fault_type || 'FAULT'}</strong>` : '<span style="color:#94a3b8;">—</span>';
+
+          return `<tr ${isFault ? 'style="background:#fef2f2;"' : ''}>
+            <td>${r.timestamp}</td>
+            <td>${Number(r.rpm).toFixed(1)}</td>
+            <td>${Number(r.torque).toFixed(1)}</td>
+            <td>${Number(r.air_temp).toFixed(1)}</td>
+            <td>${r.tool_wear} min</td>
+            <td>${r.rul_hours ? Number(r.rul_hours).toFixed(1) : '—'}</td>
+            <td>${faultType}</td>
+            <td>${pill}</td>
+          </tr>`;
+        }).join('');
+      } catch (err) {
+        console.error("refreshHistoryTable error:", err);
+      }
+    }
+
+    // ── Export CSV Handler ──
+    function exportToCSV() {
+      if (!cachedRows || cachedRows.length === 0) {
+        alert("No telemetry data to export yet.");
+        return;
+      }
+      const headers = ["Timestamp", "RPM", "Torque_Nm", "Air_Temp_K", "Tool_Wear_min", "RUL_Hours", "Status"];
+      const csvLines = [headers.join(",")];
+
+      cachedRows.forEach(r => {
+        csvLines.push([
+          r.timestamp,
+          r.rpm,
+          r.torque,
+          r.air_temp,
+          r.tool_wear,
+          r.rul_hours,
+          r.fault_status
+        ].join(","));
+      });
+
+      const blob = new Blob([csvLines.join("\n")], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `pump_telemetry_${new Date().toISOString().slice(0,19)}.csv`);
+      a.click();
+    }
+
+    // ── Alarm Latching (Keep warning visible for 15s after fault) ──
+    let lastFaultTime = 0;
+    let latchedFaultType = "FAULT";
+    let latchedRul = 0;
+    let latchedSensors = null;
+    const FAULT_LATCH_MS = 15000;
+
+    function dismissAlarm() {
+      lastFaultTime = 0;
+      latchedSensors = null;
+      document.getElementById('alarm-banner').style.display = 'none';
+      document.getElementById('status-pill').className = 'live-status-pill';
+      document.getElementById('status-text').textContent = 'SYSTEM NORMAL';
+      document.getElementById('ml-status-display').textContent = 'NORMAL';
+      document.getElementById('ml-status-display').style.color = 'var(--emerald-primary)';
+      document.getElementById('ml-mode-display').textContent = 'HEALTHY';
+      document.getElementById('ml-mode-display').style.color = 'var(--blue-primary)';
+      document.getElementById('ml-mode-display').style.background = 'var(--blue-light)';
+      document.getElementById('ml-mode-display').style.borderColor = 'var(--blue-border)';
+    }
+
+    function buildPhysicsExplanationHTML(faultType, p) {
+      const type = (faultType || '').toUpperCase();
+      let html = '';
+
+      if (type.includes('PWF') || type.includes('POWER')) {
+        const isUnder = p.powerKw < 3.5;
+        const conditionText = isUnder
+          ? `P = ${p.powerKw.toFixed(2)} kW &lt; 3.5 kW (Under-power / Motor Stall / Cavitation)`
+          : `P = ${p.powerKw.toFixed(2)} kW &gt; 9.0 kW (Over-power / Mechanical Overload / Current Surge)`;
+        html = `
+          <div style="font-weight: 700; color: #991b1b; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator"></i> WHY THIS FAULT OCCURRED (Physical Equation Breakdown):
+          </div>
+          <div>&bull; <strong>Applied Physical Law:</strong> Hydraulic Shaft Power formula: <code>P = (2&pi; &times; RPM &times; Torque) / 60,000</code></div>
+          <div>&bull; <strong>Live Values During Fault:</strong> RPM = <strong>${Math.round(p.rpm)}</strong>, Torque = <strong>${p.torque.toFixed(1)} Nm</strong> &rarr; Calculated Power = <strong style="background:#fee2e2; padding:2px 7px; border-radius:4px; color:#991b1b;">${p.powerKw.toFixed(2)} kW</strong></div>
+          <div>&bull; <strong>Violated Safety Envelope:</strong> Safe Range is <strong>3.5 kW &le; P &le; 9.0 kW</strong>. Breached condition: <span style="font-weight:700; color:#dc2626; background:#fee2e2; padding:2px 7px; border-radius:4px;">${conditionText}</span></div>
+          <div>&bull; <strong>Explainable AI Verdict:</strong> Random Forest model evaluated this power envelope breach and classified it as <strong>Power Failure (PWF)</strong>.</div>
+        `;
+      } else if (type.includes('HDF') || type.includes('HEAT')) {
+        html = `
+          <div style="font-weight: 700; color: #991b1b; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator"></i> WHY THIS FAULT OCCURRED (Physical Equation Breakdown):
+          </div>
+          <div>&bull; <strong>Applied Physical Law:</strong> Thermal Dissipation Gradient: <code>&Delta;T = Process_Temp &minus; Air_Temp</code></div>
+          <div>&bull; <strong>Live Values During Fault:</strong> Process Temp = <strong>${p.procTemp.toFixed(1)} K</strong>, Air Temp = <strong>${p.airTemp.toFixed(1)} K</strong>, Speed = <strong>${Math.round(p.rpm)} RPM</strong></div>
+          <div>&bull; <strong>Violated Safety Envelope:</strong> Safe cooling requires <strong>&Delta;T &ge; 8.6 K</strong> and Speed &ge; 1380 RPM. Breached condition: <span style="font-weight:700; color:#dc2626; background:#fee2e2; padding:2px 7px; border-radius:4px;">&Delta;T = ${p.deltaT.toFixed(1)} K (&lt; 8.6 K) with inadequate forced-air cooling</span>.</div>
+          <div>&bull; <strong>Explainable AI Verdict:</strong> Random Forest model detected thermodynamic stagnation and classified it as <strong>Heat Dissipation Failure (HDF)</strong>.</div>
+        `;
+      } else if (type.includes('OSF') || type.includes('OVERSTRAIN')) {
+        html = `
+          <div style="font-weight: 700; color: #991b1b; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator"></i> WHY THIS FAULT OCCURRED (Physical Equation Breakdown):
+          </div>
+          <div>&bull; <strong>Applied Physical Law:</strong> Mechanical Fatigue Overstrain: <code>&sigma; = Tool_Wear &times; Torque</code></div>
+          <div>&bull; <strong>Live Values During Fault:</strong> Impeller Wear = <strong>${p.wear} min</strong>, Torque = <strong>${p.torque.toFixed(1)} Nm</strong></div>
+          <div>&bull; <strong>Violated Safety Envelope:</strong> Structural fatigue limit is <strong>&sigma; &le; 11,000 min&middot;Nm</strong>. Breached condition: <span style="font-weight:700; color:#dc2626; background:#fee2e2; padding:2px 7px; border-radius:4px;">&sigma; = ${Math.round(p.overstrain)} (&gt; 11,000 min&middot;Nm)</span> &rarr; severe shaft warping / blade fracture risk.</div>
+          <div>&bull; <strong>Explainable AI Verdict:</strong> Random Forest model detected mechanical stress overload and classified it as <strong>Overstrain Failure (OSF)</strong>.</div>
+        `;
+      } else if (type.includes('TWF') || type.includes('TOOL')) {
+        html = `
+          <div style="font-weight: 700; color: #991b1b; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator"></i> WHY THIS FAULT OCCURRED (Physical Breakdown):
+          </div>
+          <div>&bull; <strong>Applied Physical Metric:</strong> Cumulative Impeller Friction Runtime</div>
+          <div>&bull; <strong>Live Values During Fault:</strong> Tool Wear = <strong style="background:#fee2e2; padding:2px 7px; border-radius:4px; color:#991b1b;">${p.wear} min</strong></div>
+          <div>&bull; <strong>Violated Safety Envelope:</strong> Design fatigue life threshold is <strong>Wear &le; 240 min</strong>. Breached condition: <span style="font-weight:700; color:#dc2626; background:#fee2e2; padding:2px 7px; border-radius:4px;">Wear reached ${p.wear} min (&ge; 240 min)</span> &rarr; severe blade erosion &amp; seal breakdown.</div>
+          <div>&bull; <strong>Explainable AI Verdict:</strong> Random Forest model detected material wearout and classified it as <strong>Tool Wear Failure (TWF)</strong>.</div>
+        `;
+      } else {
+        html = `
+          <div style="font-weight: 700; color: #991b1b; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-calculator"></i> WHY THIS FAULT OCCURRED (Physical Breakdown):
+          </div>
+          <div>&bull; <strong>Nature of Failure:</strong> Stochastic Process Transient / Unmodeled External Shock.</div>
+          <div>&bull; <strong>Observation:</strong> Boundary equations are within bounds, but an unexpected transient surge or particle intrusion caused loss of operation.</div>
+          <div>&bull; <strong>Explainable AI Verdict:</strong> Random Forest ensemble identified multi-variable anomaly and classified it as <strong>Random Failure (RNF)</strong>.</div>
+        `;
+      }
+      return html;
+    }
+
+    // ── Main Polling Loop ──
+    let pollCount = 0;
+    async function pollState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        const s = data.state;
+        const hist = data.history;
+
+        const rpm = s.rpm || 0;
+        const torque = s.torque || 0;
+        const airTemp = s.air_temp || 0;
+        const procTemp = s.process_temp || (airTemp + 10.0);
+        const wear = s.tool_wear || 0;
+        const rul = s.rul_hours ?? 380;
+        const deltaT = Math.max(0, procTemp - airTemp);
+        const powerKw = (torque * (2 * Math.PI * rpm / 60)) / 1000.0;
+        const overstrain = wear * torque;
+
+        document.getElementById('val-rpm').textContent = rpm ? Math.round(rpm) : '—';
+        document.getElementById('sub-freq').textContent = rpm ? `${(rpm / 60).toFixed(1)} Hz` : '—';
+
+        document.getElementById('val-torque').textContent = torque ? torque.toFixed(1) : '—';
+        document.getElementById('sub-torque-load').textContent = torque ? `${Math.round((torque / 70) * 100)}% load` : '—';
+
+        document.getElementById('val-power').textContent = rpm ? powerKw.toFixed(2) : '—';
+
+        document.getElementById('val-temp-diff').textContent = airTemp ? deltaT.toFixed(1) : '—';
+        document.getElementById('val-proc-temp').textContent = procTemp ? `${procTemp.toFixed(1)} K` : '—';
+        document.getElementById('val-air-temp').textContent = airTemp ? `${airTemp.toFixed(1)} K` : '—';
+
+        document.getElementById('val-wear').textContent = wear;
+        document.getElementById('sub-wear-pct').textContent = `${Math.round((wear / 250) * 100)}% worn`;
+
+        // Constraint Checks
+        document.getElementById('diag-cur-dt').textContent = `${deltaT.toFixed(1)} K`;
+        const dtPass = deltaT >= 8.6;
+        const dtPill = document.getElementById('diag-pill-dt');
+        dtPill.textContent = dtPass ? 'PASS' : 'WARN';
+        dtPill.className = dtPass ? 'badge-check badge-pass' : 'badge-check badge-warn';
+
+        document.getElementById('diag-cur-power').textContent = `${powerKw.toFixed(2)} kW`;
+        const powerPass = powerKw >= 3.5 && powerKw <= 9.0;
+        const powerPill = document.getElementById('diag-pill-power');
+        powerPill.textContent = powerPass ? 'PASS' : 'WARN';
+        powerPill.className = powerPass ? 'badge-check badge-pass' : 'badge-check badge-warn';
+
+        document.getElementById('diag-cur-overstrain').textContent = Math.round(overstrain);
+        const strainPass = overstrain <= 11000;
+        const strainPill = document.getElementById('diag-pill-overstrain');
+        strainPill.textContent = strainPass ? 'PASS' : 'WARN';
+        strainPill.className = strainPass ? 'badge-check badge-pass' : 'badge-check badge-warn';
+
+        document.getElementById('diag-cur-wear').textContent = `${wear} min`;
+        const wearPass = wear <= 240;
+        const wearPill = document.getElementById('diag-pill-wear');
+        wearPill.textContent = wearPass ? 'PASS' : 'WARN';
+        wearPill.className = wearPass ? 'badge-check badge-pass' : 'badge-check badge-warn';
+
+        // RUL Prognostics
+        document.getElementById('rul-text').textContent = `${rul.toFixed(1)} HOURS`;
+        const rulPct = Math.min(100, Math.max(0, (rul / 400) * 100));
+        document.getElementById('rul-bar').style.width = `${rulPct}%`;
+
+        // Status & Alarm Latching Logic
+        const isCurrentFault = (s.fault_status === 'FAULT');
+        if (isCurrentFault) {
+          lastFaultTime = Date.now();
+          latchedFaultType = s.fault_type || 'GENERAL FAILURE';
+          latchedRul = rul;
+          latchedSensors = {
+            rpm: rpm,
+            torque: torque,
+            airTemp: airTemp,
+            procTemp: procTemp,
+            wear: wear,
+            deltaT: deltaT,
+            powerKw: powerKw,
+            overstrain: overstrain
+          };
+        }
+
+        const elapsedSinceFault = Date.now() - lastFaultTime;
+        const isAlarmLatched = (lastFaultTime > 0 && elapsedSinceFault < FAULT_LATCH_MS);
+        const isFaultActive = isCurrentFault || isAlarmLatched;
+
+        const pill = document.getElementById('status-pill');
+        const pillText = document.getElementById('status-text');
+        const mlStatus = document.getElementById('ml-status-display');
+        const mlMode = document.getElementById('ml-mode-display');
+        const banner = document.getElementById('alarm-banner');
+        const note = document.getElementById('diag-note');
+        const timerBadge = document.getElementById('fault-hold-timer');
+        const physicsBox = document.getElementById('alarm-physics-box');
+
+        if (isFaultActive) {
+          const activeType = isCurrentFault ? (s.fault_type || 'GENERAL FAILURE') : latchedFaultType;
+          const activeRul = isCurrentFault ? rul : latchedRul;
+          const activePhysics = latchedSensors || { rpm, torque, airTemp, procTemp, wear, deltaT, powerKw, overstrain };
+          const remainingSec = Math.max(1, Math.ceil((FAULT_LATCH_MS - elapsedSinceFault) / 1000));
+
+          pill.className = 'live-status-pill fault';
+          pillText.textContent = 'FAULT DETECTED';
+
+          mlStatus.textContent = 'FAULT';
+          mlStatus.style.color = 'var(--rose-primary)';
+          mlMode.textContent = activeType;
+          mlMode.className = 'ai-mode-tag font-mono';
+          mlMode.style.borderColor = 'var(--rose-border)';
+          mlMode.style.color = 'var(--rose-primary)';
+          mlMode.style.background = 'var(--rose-light)';
+
+          banner.style.display = 'flex';
+          document.getElementById('alarm-title').textContent = `CRITICAL FAULT DETECTED: ${activeType}`;
+          document.getElementById('alarm-desc').textContent = `Failure Mode: ${activeType} | Estimated RUL: ${activeRul.toFixed(1)} hrs remaining | Immediate inspection required.`;
+          document.getElementById('fault-type-badge').textContent = activeType;
+
+          if (timerBadge) {
+            timerBadge.textContent = isCurrentFault ? "HOLD: 15s" : `HOLD: ${remainingSec}s`;
+          }
+
+          if (physicsBox) {
+            physicsBox.innerHTML = buildPhysicsExplanationHTML(activeType, activePhysics);
+          }
+
+          note.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color: var(--rose-primary); margin-right: 6px;"></i> <strong style="color: var(--rose-primary);">XAI ROOT-CAUSE:</strong> Physical safety envelope breach detected on <strong>${activeType}</strong> &rarr; Random Forest flags immediate preventive maintenance.`;
+        } else {
+          pill.className = 'live-status-pill';
+          pillText.textContent = 'SYSTEM NORMAL';
+
+          mlStatus.textContent = 'NORMAL';
+          mlStatus.style.color = 'var(--emerald-primary)';
+          mlMode.textContent = 'HEALTHY';
+          mlMode.className = 'ai-mode-tag font-mono';
+          mlMode.style.borderColor = 'var(--blue-border)';
+          mlMode.style.color = 'var(--blue-primary)';
+          mlMode.style.background = 'var(--blue-light)';
+
+          banner.style.display = 'none';
+          note.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--emerald-primary); margin-right: 6px;"></i> Telemetry nominal. Hydrodynamic load, mechanical torque, and thermal dissipation conform to baseline standards.`;
+        }
+
+        // Charts
+        if (hist && hist.length > 0) {
+          const labels = hist.map(h => h.time);
+          updateChartData(chartRpm, labels, hist.map(h => h.rpm));
+          updateChartData(chartTorque, labels, hist.map(h => h.torque));
+          updateChartData(chartTemp, labels, hist.map(h => h.air_temp));
+        }
+
+        document.getElementById('footer-packet-count').textContent = s.row_number || (hist ? hist.length : 0);
+        document.getElementById('footer-sync-time').textContent = s.timestamp || '—';
+
+        pollCount++;
+        if (pollCount % 4 === 0) {
+          refreshHistoryTable();
+        }
+
+      } catch (err) {
+        console.error("pollState error:", err);
+      }
+    }
+
+    setInterval(pollState, 1000);
+    pollState();
+    refreshHistoryTable();
+  </script>
+</body>
+</html>

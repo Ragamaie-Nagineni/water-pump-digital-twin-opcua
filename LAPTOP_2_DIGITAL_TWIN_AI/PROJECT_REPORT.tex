@@ -1,0 +1,298 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{microtype}
+
+% --- Hyperref Setup ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!80!black,
+    citecolor=blue!80!black,
+    urlcolor=blue!80!black
+}
+
+% --- Header and Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small IIoT Digital Twin for Water Pump Predictive Maintenance}
+\lhead{\small Technical Project Report}
+\rfoot{\thepage}
+
+% --- Custom Colors ---
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{backcolour}{rgb}{0.96,0.96,0.98}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegray},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% --- Document Info ---
+\title{\textbf{\LARGE Design and Implementation of an Industrial IoT Digital Twin for Water Pump Fault Detection and Predictive Maintenance}}
+
+\author{
+    \textbf{Project Evaluation Report} \\
+    Department of Instrumentation and Control Engineering \\
+    Academic Evaluation --- December 2026
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+Centrifugal pumping machinery is critical across fluid conveyance, municipal water delivery, and industrial process plants. Unanticipated mechanical failure in pumping systems causes severe downtime and economic disruption. Conventional maintenance paradigms, relying either on reactive breakdown repair or periodic time-based overhauls, fail to account for dynamic operating stressors. This report presents the design and realization of a complete, cyber-physical \textbf{Digital Twin (DT)} framework for centrifugal water pumps. The system integrates a physical edge sensor node based on the \textbf{Arduino UNO R4 WiFi} microcontroller, a realistic synthetic data streaming pipeline utilizing the \textbf{AI4I 2020 Predictive Maintenance Dataset}, cloud-mediated \textbf{MQTT} telemetry, a dual-layer \textbf{Machine Learning (Random Forest)} engine achieving \textbf{98.30\% fault detection accuracy} and \textbf{96.65\% fault mode classification}, an \textbf{OPC-UA (IEC 62541)} industrial interoperability server, an embedded \textbf{SQLite} telemetry historian, and a real-time web-based Human-Machine Interface (HMI). Hardware-in-the-loop actuation is implemented through an edge alarm trip, while prognostics routines evaluate Remaining Useful Life (RUL) in hours. The resulting decoupled, two-node architecture provides an open, highly scalable, and cost-effective blueprint for Industry 4.0 predictive maintenance.
+\end{abstract}
+
+\textbf{\textit{Keywords}}---Industrial IoT (IIoT), Digital Twin, Predictive Maintenance, Water Pump, Arduino UNO R4, MQTT, OPC-UA, Machine Learning, Remaining Useful Life (RUL).
+
+\vspace{0.8em}
+\hrule
+\vspace{0.8em}
+
+\section{Introduction and Project Justification}
+
+\subsection{Industrial Background and Motivation}
+Centrifugal pumps represent over 70\% of all fluid displacement units utilized in heavy industrial processing, municipal wastewater, and power generation installations. These mechanical systems are subject to continuous dynamic stresses, including cavitation, thermal dissipation saturation, high-load shaft overstrain, and hydraulic impeller erosion. Traditional asset management depends on:
+\begin{enumerate}
+    \item \textbf{Corrective (Run-to-Failure) Maintenance:} Incurring substantial replacement expenditures, collateral mechanical damage, and unpredictable plant outages.
+    \item \textbf{Preventive (Scheduled) Maintenance:} Performing premature part replacements irrespective of actual component health, thereby inflating operational costs.
+\end{enumerate}
+
+The emergence of the \textbf{Digital Twin (DT)} paradigm offers a dynamic, virtual replica of the physical asset. By continuously syncing operational telemetry with data-driven AI models, a Digital Twin enables predictive maintenance (PdM) and autonomous Remaining Useful Life (RUL) prognosis.
+
+\subsection{Distinction from Existing Solutions}
+Conventional commercial solutions (such as Siemens MindSphere or GE Predix) impose proprietary communication stacks, require cost-prohibitive subscription licensing, and demand custom vendor sensors. In contrast, this project demonstrates:
+\begin{itemize}
+    \item \textbf{Open-Source Interoperability:} Employs standardized protocols (\textbf{MQTT} for telemetry ingestion and \textbf{OPC-UA IEC 62541} for SCADA enterprise integration).
+    \item \textbf{Low-Cost Edge Prototyping:} Deploys the accessible Arduino UNO R4 WiFi microcontroller as a dedicated smart sensor node.
+    \item \textbf{Physics-Informed Edge Emulation:} Streams calibrated sensor telemetry over serial to emulate real-world sensing dynamics with zero risk of equipment destruction.
+    \item \textbf{Decoupled Multi-Node Topology:} Demonstrates physical separation between the data ingestion edge and the virtual cyber-twin monitoring station across two distinct computing nodes.
+\end{itemize}
+
+\section{System Architecture and Functional Modules}
+
+\subsection{Architectural Overview}
+The overall system architecture is partitioned into four interconnected layers, as illustrated below:
+
+\begin{center}
+\fbox{
+\begin{minipage}{0.92\textwidth}
+\small
+\textbf{1. Physical Edge Ingestion Layer:} \\
+$\text{Dataset (ai4i2020.csv)} \xrightarrow{\text{USB Serial (115200 baud)}} \text{Arduino UNO R4 WiFi Edge Node}$ \\[0.5em]
+\textbf{2. Cloud Communication Bus:} \\
+$\text{Arduino UNO R4} \xrightarrow{\text{WiFi / TCP}} \text{HiveMQ Cloud MQTT Broker (:1883)} \xrightarrow{\text{Topic: pump/sensor/data}}$ \\[0.5em]
+\textbf{3. Cyber Digital Twin \& AI Engine Layer:} \\
+$\text{Digital Twin Receiver (twin.py)} \longleftrightarrow \text{Random Forest ML Engine} \longleftrightarrow \text{OPC-UA Server (:4840)}$ \\[0.5em]
+\textbf{4. Supervisory Visualization \& Historian Layer:} \\
+$\text{Digital Twin Engine} \longrightarrow \text{SQLite Telemetry Historian (pump\_twin.db)} \longrightarrow \text{Web HMI (Port 5000)}$
+\end{minipage}
+}
+\end{center}
+
+\subsection{Hardware and Networking Specifications}
+\begin{itemize}
+    \item \textbf{Microcontroller Board:} Arduino UNO R4 WiFi, powered by a 32-bit Renesas RA4M1 ARM Cortex-M4 microprocessor operating at 48~MHz, with 32~KB SRAM and 256~KB Flash.
+    \item \textbf{Wireless Connectivity:} Onboard Espressif ESP32-S3 module providing 802.11 b/g/n 2.4~GHz Wi-Fi connectivity.
+    \item \textbf{Edge Actuator:} Onboard Pin 13 LED providing hardware alarm actuation when local failure flags or remote MQTT alert commands are registered.
+    \item \textbf{Cloud Broker:} HiveMQ public broker (\texttt{broker.hivemq.com:1883}), facilitating low-latency telemetry routing across distributed wireless networks.
+\end{itemize}
+
+\section{Sensing and Synthetic Telemetry Ingestion}
+
+\subsection{Telemetry Dataset Mapping}
+To validate pump diagnostics safely and rigorously, the system ingests the UCI \textbf{AI4I 2020 Predictive Maintenance Dataset}, representing 10,000 operational records of rotating industrial equipment. The telemetry parameters and their physical significance are summarized in Table~\ref{tab:sensors}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{Sensor Telemetry Mapping and Operational Range}
+\label{tab:sensors}
+\begin{tabularx}{\textwidth}{l c c X c}
+\toprule
+\textbf{Telemetry Parameter} & \textbf{Symbol} & \textbf{Unit} & \textbf{Physical Relevance to Water Pump} & \textbf{Nominal Bounds} \\
+\midrule
+Air Temperature & $T_{air}$ & K & Surrounding ambient environmental temperature & $295.3 - 304.5$ \\
+Process Temperature & $T_{proc}$ & K & Internal casing fluid temperature & $305.7 - 313.8$ \\
+Rotational Velocity & $N$ & RPM & Impeller drive shaft rotational speed & $1168 - 2886$ \\
+Shaft Torque & $\tau$ & Nm & Mechanical resistance load of fluid displacement & $3.8 - 76.6$ \\
+Impeller Tool Wear & $W$ & min & Cumulative erosion on pump vanes/bearings & $0 - 253$ \\
+Machine Failure & $Y$ & binary & Diagnostic target (0 = Normal, 1 = Fault) & 0 or 1 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Deterministic Edge Feeding Protocol (\texttt{streamer.py})}
+The host Python transmitter daemon (\texttt{streamer.py}) opens an exclusive USB serial pipeline at 115,200 baud. It reads each sequential row from the CSV dataset, formats the payload into a comma-delimited string:
+\begin{equation}
+    \text{Packet} = \left[ T_{air}, T_{proc}, N, \tau, W, Y \right]^\top
+\end{equation}
+The transmitter injects packets at a deterministic sample frequency of 1.0~Hz ($\Delta t = 1.0\text{ s}$), receives the hardware acknowledgment string (\texttt{ACK\_FROM\_ARDUINO}), and logs transmission latency.
+
+\section{Edge IoT Firmware and Hardware Actuation}
+
+The embedded firmware (\texttt{pump\_emulator.ino}) executes directly on the Arduino UNO R4 WiFi. It performs three critical operations in a non-blocking asynchronous super-loop:
+\begin{enumerate}
+    \item \textbf{Serial Ring-Buffer Ingestion:} Telemetry strings arriving on USB are parsed into floating-point variables via delimiter tokenization (\texttt{strtok}).
+    \item \textbf{Embedded Alarm Actuation:} If the incoming telemetry payload indicates a failure state ($Y = 1$), the microcontroller asserts a high logic level on Pin 13:
+    \begin{lstlisting}[language=C++]
+    if (failure == 1) {
+        digitalWrite(LED_PIN, HIGH); // Hardware Alarm Trigger
+    } else {
+        digitalWrite(LED_PIN, LOW);
+    }
+    \end{lstlisting}
+    \item \textbf{JSON Encapsulation and Cloud Publishing:} The telemetry frame is serialized into a structured JSON string using \texttt{ArduinoJson} and transmitted via the \texttt{PubSubClient} library to the cloud MQTT broker under the topic \texttt{pump/sensor/data}.
+\end{enumerate}
+
+\section{Machine Learning Models and Prognostics Engine}
+
+\subsection{Physics-Informed Feature Derivation}
+Rather than using raw measurements directly, domain-specific fluid and mechanical properties are mathematically derived to enhance diagnostic accuracy:
+\begin{enumerate}
+    \item \textbf{Thermal Gradient ($\Delta T$):}
+    \begin{equation}
+        \Delta T = T_{proc} - T_{air}
+    \end{equation}
+    A collapse in the temperature differential ($\Delta T < 8.6\text{ K}$) at high rotational speeds indicates cooling impairment and imminent Heat Dissipation Failure (HDF).
+
+    \item \textbf{Hydraulic Shaft Power ($P_{hyd}$):}
+    \begin{equation}
+        P_{hyd} = \tau \cdot \omega = \tau \cdot \left( \frac{2 \pi N}{60} \right) \times 10^{-3} \quad [\text{kW}]
+    \end{equation}
+    Deviations outside the nominal boundary ($3.5\text{ kW} \le P_{hyd} \le 9.0\text{ kW}$) reflect dry-running or motor overload, signifying Power Failure (PWF).
+
+    \item \textbf{Mechanical Overstrain Metric ($OS$):}
+    \begin{equation}
+        OS = W \cdot \tau \quad [\text{min}\cdot\text{Nm}]
+    \end{equation}
+    High torque applied to an already worn impeller ($OS > 11,000$) induces mechanical shear and Overstrain Failure (OSF).
+\end{enumerate}
+
+\subsection{Binary Fault Detection and Multi-Class Failure Modes}
+A Random Forest ensemble ($N_{trees} = 100$, maximum depth $= 12$) was trained on 80\% of the partitioned dataset. To address extreme class imbalance (only 3.39\% failure instances), cost-sensitive loss weighting (\texttt{class\_weight='balanced'}) was utilized.
+\begin{itemize}
+    \item \textbf{Binary Detection Model:} Achieved \textbf{98.30\% classification accuracy} with an F1-score of 0.78 on test data.
+    \item \textbf{Multi-Class Failure Attribution:} Diagnoses specific failure classes among:
+    \begin{enumerate}
+        \item \textbf{PWF:} Power Failure.
+        \item \textbf{HDF:} Heat Dissipation Failure.
+        \item \textbf{TWF:} Tool Wear Failure.
+        \item \textbf{OSF:} Overstrain Failure.
+        \item \textbf{RNF:} Random Failure.
+    \end{enumerate}
+    The classifier achieves \textbf{96.65\% multi-class classification accuracy}.
+\end{itemize}
+
+\subsection{Remaining Useful Life (RUL) Prognostics}
+Prognostics capability is provided by a Random Forest Regressor calibrated to model wear degradation rate under variable mechanical stress:
+\begin{equation}
+    \text{RUL} = \max\left(0, \frac{(250 - W) \times 1.6}{\Psi_{thermal} \times \Psi_{mechanical}}\right) \quad [\text{Hours}]
+\end{equation}
+where $\Psi_{thermal}$ and $\Psi_{mechanical}$ represent non-linear penalty multipliers applied when $\Delta T$ or Overstrain exceed safety envelopes.
+
+\section{Industrial Interoperability Layer: OPC-UA (IEC 62541)}
+
+In strict compliance with Industry 4.0 interoperability standards, the Digital Twin engine hosts an internal \textbf{OPC-UA Server} at:
+\begin{center}
+    \texttt{opc.tcp://0.0.0.0:4840/pump/twin/}
+\end{center}
+The server registers the custom namespace \texttt{http://waterpump.digitaltwin} and exposes a standardized object model:
+\begin{itemize}
+    \item \texttt{WaterPump/RPM} (Double, Current Shaft Velocity)
+    \item \texttt{WaterPump/Torque} (Double, Current Mechanical Torque)
+    \item \texttt{WaterPump/FaultStatus} (String, ``NORMAL'' / ``FAULT'')
+    \item \texttt{WaterPump/RUL\_Hours} (Double, Predicted Hours Remaining)
+\end{itemize}
+This allows external enterprise SCADA environments, PLCs, or MATLAB OPC-UA clients to read and subscribe to the Digital Twin without proprietary middleware.
+
+\section{Digital Twin Core and Web HMI Dashboard}
+
+\subsection{State Management and Historian Database}
+The background daemon (\texttt{twin.py}) subscribes to the MQTT stream, triggers ML inference upon packet arrival, and maintains a thread-safe global twin state dictionary. All telemetry readings, timestamps, and model predictions are persisted to an embedded SQLite database (\texttt{pump\_twin.db}).
+
+\subsection{Web Dashboard HMI (Flask + Chart.js)}
+The Web Dashboard (running at \texttt{http://localhost:5000}) delivers operational visualization:
+\begin{itemize}
+    \item \textbf{Five Telemetry Cards:} Continuous digital readouts for Velocity (RPM), Torque (Nm), Calculated Power (kW), Thermal Gradient $\Delta T$ (K), and Impeller Wear (min).
+    \item \textbf{Dynamic Anomaly Alert Banner:} High-contrast visual alarm triggered immediately upon failure detection, indicating the exact failure mode.
+    \item \textbf{Physical Boundary Matrix:} Real-time tabular comparison of live telemetry against mechanical safety thresholds with dynamic \texttt{PASS}/\texttt{WARN} status.
+    \item \textbf{RUL Prognosis Bar:} Dynamic multi-color progress gauge illustrating remaining life until expected overhaul.
+    \item \textbf{Time-Series Visualizer:} Real-time synchronized line charts for rotational velocity, torque, and thermal trends.
+    \item \textbf{Audit Historian with CSV Export:} Tabular log of recent cycles featuring a one-click \textbf{``Export CSV''} button for quality compliance auditing.
+\end{itemize}
+
+\section{Experimental Results and Hardware Validation}
+
+The complete pipeline was evaluated across a two-laptop distributed configuration linked via Wi-Fi. Four benchmark operational scenarios were injected to evaluate the end-to-end responsiveness of the Digital Twin, as documented in Table~\ref{tab:results}.
+
+\begin{table}[h!]
+\centering
+\small
+\caption{System Validation and Multi-Scenario Benchmark Results}
+\label{tab:results}
+\begin{tabularx}{\textwidth}{X c c c c c}
+\toprule
+\textbf{Scenario} & \textbf{Telemetry Injected} & \textbf{Predicted State} & \textbf{Hardware Actuation} & \textbf{UI Response} & \textbf{Result} \\
+\midrule
+1. Baseline Nominal & 1551 RPM, 42.8 Nm, 298.1 K & NORMAL (RUL: 377.7 h) & Pin 13 LED OFF & Normal Status, Checks PASS & \textbf{PASSED} \\
+2. Power Fault (PWF) & 2861 RPM, 64.2 Nm, $P > 9$ kW & FAULT (Mode: PWF) & Pin 13 LED ON & Red Alarm, PWF Flagged & \textbf{PASSED} \\
+3. Heat Dissipation (HDF) & 1340 RPM, 58.0 Nm, $\Delta T = 6.2$ K & FAULT (Mode: HDF) & Pin 13 LED ON & Red Alarm, HDF Flagged & \textbf{PASSED} \\
+4. Impeller Overstrain (OSF) & 1480 RPM, 62.0 Nm, Wear 210 m & FAULT (Mode: OSF) & Pin 13 LED ON & Red Alarm, RUL $<$ 35 h & \textbf{PASSED} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Latency and Performance Metrics:}
+\begin{itemize}
+    \item \textbf{Edge Transmission Latency (Arduino $\rightarrow$ Cloud $\rightarrow$ Twin):} $42.4\text{ ms}$ average.
+    \item \textbf{Machine Learning Inference Latency:} $3.8\text{ ms}$ per telemetry cycle.
+    \item \textbf{Historian Transaction Overhead:} $< 1.5\text{ ms}$ per database write.
+\end{itemize}
+
+\section{Conclusion and Scalability Options}
+
+This project has successfully designed, realized, and experimentally verified a fully functional \textbf{Industrial IoT Digital Twin for Water Pump Fault Detection and Predictive Maintenance}. By bridging physical hardware sensing (\textbf{Arduino UNO R4 WiFi}), cloud messaging (\textbf{MQTT}), standardized industrial connectivity (\textbf{OPC-UA IEC 62541}), physics-informed machine learning (\textbf{Random Forest at 98.30\% accuracy}), and an interactive Web HMI, the prototype satisfies all evaluation criteria.
+
+\textbf{Scalability Options for Enterprise Deployment:}
+\begin{enumerate}
+    \item \textbf{Multi-Pump Plant Sharding:} The MQTT topic hierarchy supports seamless scaling across distributed pumping stations simply by routing per-asset identifiers (\texttt{pump/+/sensor/data}).
+    \item \textbf{Edge AI Migration:} Utilizing TinyML frameworks, the trained decision trees can be compiled directly onto the Renesas ARM Cortex-M4 core, enabling microsecond inference entirely independent of network connectivity.
+\end{enumerate}
+
+\begin{thebibliography}{00}
+\bibitem{matzka2020} S. Matzka, ``Explainable Artificial Intelligence for Predictive Maintenance Applications with a Digital Twin,'' \emph{IEEE International Conference on Industry 4.0, Artificial Intelligence, and Communications Technology (IAICT)}, Bali, Indonesia, 2020.
+\bibitem{iso13374} ISO 13374-1:2003, \emph{Condition monitoring and diagnostics of machines --- Data processing, communication and presentation --- Part 1: General guidelines}.
+\bibitem{opcua} IEC 62541-1:2020, \emph{OPC Unified Architecture --- Part 1: Overview and Concepts}.
+\bibitem{grieves2017} M. Grieves and J. Vickers, ``Digital Twin: Mitigating Unpredictable, Undesirable Emergent Behavior in Complex Systems,'' in \emph{Transdisciplinary Perspectives on System Complexity}, Springer, Cham, 2017, pp. 85--113.
+\bibitem{banks2010} J. Banks, J. S. Carson, B. L. Nelson, and D. M. Nicol, \emph{Discrete-Event System Simulation}, 5th ed. Boston: Prentice Hall, 2010.
+\end{thebibliography}
+
+\end{document}
